@@ -1,0 +1,46 @@
+networks:
+  blog: {}
+  proxy:
+    name: ${PROXY_NETWORK_NAME:-proxy}
+    external: true
+
+volumes:
+  db_data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${BLOG_STACK_DIR}/db
+
+secrets:
+  db_root_password:
+    name: ${BLOG_MARIADB_ROOT_PASSWORD_NAME:-blog_db_root_password}
+    external: true
+  db_user_password:
+    name: ${BLOG_MARIADB_USER_PASSWORD_NAME:-blog_db_user_password}
+    external: true
+
+configs:
+  last_backup:
+    name: ${BLOG_LAST_BACKUP_FILE:-blog_last_backup}
+    external: true
+
+services:
+  db:
+    image: mariadb:lts
+    environment:
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MARIADB_DATABASE: ${BLOG_DATABASE_NAME:-wordpress}
+      MARIADB_USER: ${BLOG_DATABASE_USER:-blog_db_user}
+      MARIADB_PASSWORD_FILE: /run/secrets/db_user_password
+    configs:
+      - source: last_backup
+        target: /docker-entrypoint-initdb.d/01-initdb.sql
+        mode: 0644
+    volumes:
+      - db_data:/var/lib/mysql
+    secrets:
+      - db_root_password
+      - db_user_password
+    networks:
+      - blog
